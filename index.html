@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FlareForecast — POTS Flare Predictor</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="logo">⚡ FlareForecast</div>
+      <p class="tagline">Predict & prevent POTS / dysautonomia flares before they hit.</p>
+    </header>
+
+    <main class="grid">
+      <!-- LEFT: Inputs -->
+      <section class="panel inputs-panel">
+        <h2>Today's Health Snapshot</h2>
+
+        <div class="scenarios">
+          <button type="button" class="scenario-btn" data-scenario="good">✅ Good day</button>
+          <button type="button" class="scenario-btn" data-scenario="average">😐 Average day</button>
+          <button type="button" class="scenario-btn" data-scenario="bad">⚠️ Bad day</button>
+        </div>
+
+        <form id="snapshot-form">
+          <div class="field">
+            <label>Sleep (hours) <span id="val-sleep">7.0</span></label>
+            <input type="range" id="sleep" min="3" max="12" step="0.5" value="7" />
+          </div>
+          <div class="field">
+            <label>Water intake (L) <span id="val-water">2.2</span></label>
+            <input type="range" id="water" min="0.5" max="5" step="0.1" value="2.2" />
+          </div>
+          <div class="field">
+            <label>Sodium (mg) <span id="val-sodium">3000</span></label>
+            <input type="range" id="sodium" min="1000" max="6000" step="100" value="3000" />
+          </div>
+          <div class="field">
+            <label>Standing / active hours <span id="val-standing">4.0</span></label>
+            <input type="range" id="standing" min="0" max="12" step="0.5" value="4" />
+          </div>
+          <div class="field">
+            <label>Stress level (1–10) <span id="val-stress">5</span></label>
+            <input type="range" id="stress" min="1" max="10" step="1" value="5" />
+          </div>
+          <div class="field">
+            <label>Current symptom score (0–10) — display only <span id="val-symptom">4.0</span></label>
+            <input type="range" id="symptom" min="0" max="10" step="0.5" value="4" />
+          </div>
+          <div class="field">
+            <label>Barometric pressure (hPa) <span id="val-pressure">1013</span></label>
+            <input type="range" id="pressure" min="980" max="1040" step="1" value="1013" />
+          </div>
+          <div class="field">
+            <label>Temperature (°C) <span id="val-temp">22</span></label>
+            <input type="range" id="temp" min="5" max="40" step="1" value="22" />
+          </div>
+          <div class="field checkbox">
+            <label><input type="checkbox" id="meds" checked /> Took meds / electrolytes today</label>
+          </div>
+          <button type="submit" class="btn-primary" id="predict-btn">
+            <span class="btn-text">Predict flare risk</span>
+            <span class="spinner hidden"></span>
+          </button>
+        </form>
+      </section>
+
+      <!-- RIGHT: Prediction + timeline -->
+      <section class="panel result-panel">
+        <div id="result-card" class="result-card">
+          <div class="gauge-wrap">
+            <svg viewBox="0 0 200 120" class="gauge">
+              <defs>
+                <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#10b981" />
+                  <stop offset="50%" stop-color="#f59e0b" />
+                  <stop offset="100%" stop-color="#f43f5e" />
+                </linearGradient>
+              </defs>
+              <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#e2e8f0" stroke-width="18" stroke-linecap="round" />
+              <path id="gauge-bg" d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="url(#gaugeGradient)" stroke-width="18" stroke-linecap="round" stroke-dasharray="251.3" stroke-dashoffset="251.3" opacity="0.15" />
+              <path id="gauge-fill" d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="url(#gaugeGradient)" stroke-width="18" stroke-linecap="round" stroke-dasharray="251.3" stroke-dashoffset="251.3" />
+            </svg>
+            <div class="gauge-label">
+              <div id="risk-percent">--%</div>
+              <div id="risk-level">Enter your snapshot</div>
+            </div>
+          </div>
+
+          <div id="risk-factors" class="risk-factors hidden">
+            <h3>Top risk drivers</h3>
+            <p class="subhead">Based on lifestyle, weather, and medication — not just how you feel right now.</p>
+            <ul id="factors-list"></ul>
+            <p class="model-note">Model accuracy on held-out data: <strong id="model-acc">--</strong></p>
+          </div>
+        </div>
+
+        <div class="error-banner hidden" id="error-banner">
+          <span>⚠️ Could not reach the backend. Make sure it is running on port 8000.</span>
+          <button id="close-error">×</button>
+        </div>
+
+        <div class="timeline-card">
+          <h2>Recent Symptom History</h2>
+          <canvas id="timeline" height="160"></canvas>
+          <p class="hint">Synthetic demo data. In production, this comes from patient wearables & journals.</p>
+        </div>
+
+        <div class="whatif-card">
+          <h2>What-If Simulator</h2>
+          <p class="subhead">See how moving each factor to your average would change your risk.</p>
+          <div id="whatif-loading" class="whatif-loading hidden">Calculating scenarios...</div>
+          <ul id="whatif-list" class="whatif-list"></ul>
+          <p class="hint">Only shows factors that would actually lower your risk.</p>
+        </div>
+
+        <div class="history-card">
+          <div class="history-header">
+            <h2>Your Prediction Journal</h2>
+            <button type="button" class="btn-secondary" id="clear-history">Clear</button>
+          </div>
+          <ul id="history-list" class="history-list"></ul>
+          <p class="hint">Saved locally in your browser. In production, this syncs to a patient account.</p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>Built for hackathons. Not medical advice. Always consult a clinician.</p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a0c1cc59783447d2',t:'MTc4MTUyODg1MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
